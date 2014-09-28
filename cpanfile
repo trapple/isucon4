@@ -12,3 +12,4 @@ requires "Data::Dumper";
 requires "Server::Starter";
 requires "Starlet";
 requires "DDP";
+requires "Cache::Memcached::Fast";
