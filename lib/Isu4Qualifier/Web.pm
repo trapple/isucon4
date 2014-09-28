@@ -7,6 +7,10 @@ use Kossy;
 use DBIx::Sunny;
 use Digest::SHA qw/ sha256_hex /;
 use Data::Dumper;
+use Cache::Memcached::Fast;
+
+my $memd = Cache::Memcached::Fast->new({servers => [ "localhost:11211" ]});
+$memd->flush_all;
 
 sub config {
   my ($self) = @_;
@@ -44,6 +48,14 @@ sub calculate_password_hash {
 
 sub user_locked {
   my ($self, $user) = @_;
+
+  my $fail = $memd->get($user);
+  if($fail){
+    $fail++;
+    $memd->set($user, $fail);
+    return $self->config->{user_lock_threshold} <= $fail
+  }
+
   my $log = $self->db->select_row(
     'SELECT COUNT(1) AS failures FROM login_log WHERE user_id = ? AND id > IFNULL((select id from login_log where user_id = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)',
     $user->{'id'}, $user->{'id'});
@@ -53,9 +65,18 @@ sub user_locked {
 
 sub ip_banned {
   my ($self, $ip) = @_;
+  
+  my $fail = $memd->get($ip);
+  if($fail){
+    $fail++;
+    $memd->set($ip, $fail);
+    return $self->config->{ip_ban_threshold} <= $fail
+  }
+
   my $log = $self->db->select_row(
     'SELECT COUNT(1) AS failures FROM login_log WHERE ip = ? AND id > IFNULL((select id from login_log where ip = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)',
     $ip, $ip);
+  $memd->set($ip, $log->{failures});
 
   $self->config->{ip_ban_threshold} <= $log->{failures};
 };
@@ -76,6 +97,8 @@ sub attempt_login {
 
   if ($user && calculate_password_hash($password, $user->{salt}) eq $user->{password_hash}) {
     $self->login_log(1, $login, $ip, $user->{id});
+    $memd->set($ip,0);
+    $memd->set($user->{id},0);
     return $user, undef;
   }
   elsif ($user) {
@@ -88,11 +111,11 @@ sub attempt_login {
   }
 };
 
-sub current_user {
-  my ($self, $user_id) = @_;
-
-  $self->db->select_row('SELECT * FROM users WHERE id = ?', $user_id);
-};
+#sub current_user {
+#  my ($self, $user_id) = @_;
+#
+#  $self->db->select_row('SELECT * FROM users WHERE id = ?', $user_id);
+#};
 
 sub last_login {
   my ($self, $user_id) = @_;
