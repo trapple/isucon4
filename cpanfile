@@ -9,3 +9,6 @@ requires "DBD::mysql";
 requires "Starman";
 requires "Plack::Session";
 requires "Data::Dumper";
+requires "Server::Starter";
+requires "Starlet";
+requires "DDP";
