@@ -13,3 +13,5 @@ mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < /home/isucon/webapp/perl/
 mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < sql/dummy_users.sql
 mysql -h ${myhost} -P ${myport} -u ${myuser} ${mydb} < sql/dummy_log.sql
 
+cd /home/isucon/webapp/perl/
+/home/isucon/env.sh carton exec perl init.pl 
