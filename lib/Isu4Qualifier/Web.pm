@@ -8,6 +8,7 @@ use DBIx::Sunny;
 use Digest::SHA qw/ sha256_hex /;
 use Data::Dumper;
 use Cache::Memcached::Fast;
+use Data::Dumper;
 
 my $memd = Cache::Memcached::Fast->new({servers => [ "localhost:11211" ]});
 $memd->flush_all;
@@ -49,18 +50,17 @@ sub calculate_password_hash {
 sub user_locked {
   my ($self, $user) = @_;
 
-  my $fail = $memd->get($user);
+  my $fail = $memd->get($user->{id});
   if($fail){
-    $fail++;
-    $memd->set($user, $fail);
     return $self->config->{user_lock_threshold} <= $fail
   }
 
   my $log = $self->db->select_row(
     'SELECT COUNT(1) AS failures FROM login_log WHERE user_id = ? AND id > IFNULL((select id from login_log where user_id = ? AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)',
     $user->{'id'}, $user->{'id'});
+  $memd->set($user->{'id'}, $log->{failures});
 
-  $self->config->{user_lock_threshold} <= $log->{failures};
+  return $self->config->{user_lock_threshold} <= $log->{failures};
 };
 
 sub ip_banned {
@@ -68,9 +68,7 @@ sub ip_banned {
   
   my $fail = $memd->get($ip);
   if($fail){
-    $fail++;
-    $memd->set($ip, $fail);
-    return $self->config->{ip_ban_threshold} <= $fail
+    return $self->config->{ip_ban_threshold} <= $fail;
   }
 
   my $log = $self->db->select_row(
@@ -173,8 +171,34 @@ sub locked_users {
   \@user_ids;
 };
 
+sub fail_count_up {
+  my ($self, $ip, $user_id) = @_;
+  if(defined $user_id){
+    my $fail = $memd->get($user_id);
+    if($fail){
+      $fail++;
+    }else{
+      $fail=1;
+    }
+    $memd->set($user_id, $fail);
+  }
+
+  {
+    my $fail = $memd->get($ip);
+    if($fail){
+      $fail++;
+    }else{
+      $fail=1;
+    }
+    $memd->set($ip, $fail);
+  }
+  
+}
+
 sub login_log {
   my ($self, $succeeded, $login, $ip, $user_id) = @_;
+  $self->fail_count_up($ip, $user_id);
+
   $self->db->query(
     'INSERT INTO login_log (`created_at`, `user_id`, `login`, `ip`, `succeeded`) VALUES (NOW(),?,?,?,?)',
     $user_id, $login, $ip, ($succeeded ? 1 : 0)
