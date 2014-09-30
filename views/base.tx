@@ -12,11 +12,7 @@
   <body>
     <div class="container">
       <h1 id="topbar">
-        <a href="/">
-          <script>
-          document.write('<img src="/images/isucon-bank.png" alt="いすこん銀行 オンラインバンキングサービス">');
-          </script>
-        </a>
+        <a href="/"><img src="/images/isucon-bank.png" alt="いすこん銀行 オンラインバンキングサービス"></a>
       </h1>
 : block content -> { }
     </div>
