@@ -11,7 +11,6 @@ use Cache::Memcached::Fast;
 use Data::Dumper;
 
 my $memd = Cache::Memcached::Fast->new({servers => [ "localhost:11211" ]});
-$memd->flush_all;
 
 sub config {
   my ($self) = @_;
@@ -51,7 +50,7 @@ sub user_locked {
   my ($self, $user) = @_;
 
   my $fail = $memd->get($user->{id});
-  if($fail){
+  if(defined $fail){
     return $self->config->{user_lock_threshold} <= $fail
   }
 
@@ -67,7 +66,7 @@ sub ip_banned {
   my ($self, $ip) = @_;
   
   my $fail = $memd->get($ip);
-  if($fail){
+  if(defined $fail){
     return $self->config->{ip_ban_threshold} <= $fail;
   }
 
